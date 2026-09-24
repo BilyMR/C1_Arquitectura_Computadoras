@@ -1,0 +1,68 @@
+graph TD
+    subgraph CPU ["Procesador (CPU - Arquitectura Von Neumann de 8 Bits)"]
+        subgraph UC ["Unidad de Control (UC)"]
+            PC["PC (Program Counter)<br/>Contador de Programa"]
+            IR["IR (Instruction Register)<br/>Registro de Instrucción"]
+            MAR["MAR (Memory Address Register)<br/>Registro de Dirección"]
+            MDR["MDR (Memory Data Register)<br/>Registro de Datos de Memoria"]
+            CU_LOGIC["Decodificador & Control<br/>Ciclo: Fetch - Decode - Execute - Store"]
+        end
+
+        subgraph ALU_REGS ["ALU y Registros Generales"]
+            AX["AX (Registro Acumulador)"]
+            BX["Registro Base (BX)"]
+            SP["SP (Puntero de Pila - Stack Pointer)"]
+            FLAGS["Flags / Banderas de Estado<br/>(ZF: Zero, CF: Carry, SF: Sign)"]
+            ALU_UNIT["ALU (Unidad Aritmético-Lógica)<br/>[ADD, SUB, DEC, CMP, etc.]"]
+        end
+    end
+
+    subgraph BUSES ["Buses del Sistema (8 Bits)"]
+        ADDR_BUS["Bus de Direcciones (Address Bus)<br/>[MAR &rarr; RAM]"]
+        DATA_BUS["Bus de Datos (Data Bus)<br/>[MDR &harr; RAM / Registros]"]
+        CTRL_BUS["Bus de Control<br/>[UC &rarr; RAM / ALU]"]
+    end
+
+    subgraph RAM_MEM ["Memoria Principal RAM (256 Bytes: 00h - FFh)"]
+        CODE_SEG["Segmento de Código (00h - 0Fh)<br/>Instrucciones del Programa"]
+        DATA_SEG["Segmento de Datos (10h - EFh)<br/>Variables y Resultados"]
+        STACK_SEG["Segmento de Pila / Stack (F0h - FFh)<br/>Estructura LIFO (Tope en FFh)"]
+    end
+
+    subgraph UI ["Interfaz Gráfica Excel / Motor VBA"]
+        PANEL["Panel de Control & Modos<br/>(Ejecutar RUN, Paso a Paso, Reset)"]
+        LOG["Log Cronológico de Micro-operaciones"]
+        ANIM["Motor de Animación Visual<br/>(Destello de Buses y Resaltado de Celdas)"]
+    end
+
+    %% Conexiones del Ciclo de Búsqueda (Fetch) y Memoria
+    PC -->|1. Copia Dirección| MAR
+    MAR -->|2. Envía Dirección| ADDR_BUS
+    ADDR_BUS --> RAM_MEM
+
+    RAM_MEM -->|3. Retorna Byte| DATA_BUS
+    DATA_BUS <-->|4. Carga Dato/Opcode| MDR
+    MDR -->|5. Pasa Opcode| IR
+    IR --> CU_LOGIC
+
+    %% Control y ALU
+    CU_LOGIC -->|Señales de Control| CTRL_BUS
+    CTRL_BUS --> ALU_UNIT
+    CTRL_BUS --> RAM_MEM
+
+    %% Flujo de Datos en Registros y ALU
+    AX <--> DATA_BUS
+    BX <--> DATA_BUS
+    SP --> STACK_SEG
+
+    AX --> ALU_UNIT
+    BX --> ALU_UNIT
+    ALU_UNIT -->|Garda Resultado| AX
+    ALU_UNIT -->|Actualiza Estados| FLAGS
+
+    %% Interacción con la Interfaz de Usuario
+    PANEL -->|Inicia Ejecución| CU_LOGIC
+    CU_LOGIC -->|Registra Eventos| LOG
+    CU_LOGIC -->|Dispara Iluminación| ANIM
+    ANIM -.-> RAM_MEM
+    ANIM -.-> CPU
