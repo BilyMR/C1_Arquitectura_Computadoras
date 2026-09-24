@@ -1,18 +1,18 @@
 Option Explicit
 
 ' ==============================================================================
-' SIMULADOR CPU VON NEUMANN - ANIMACIÓN LENTA Y VISIBLE DE BUSES Y RAM
+' SIMULADOR CPU VON NEUMANN - MÓDULO ÚNICO COMPLETO
 ' ==============================================================================
 
 Public Sub Pausa(Segundos As Double)
     Dim TiempoFinal As Double
     TiempoFinal = Timer + Segundos
     Do While Timer < TiempoFinal
-        DoEvents ' Fuerza a Excel a redibujar celdas y colores en la pantalla
+        DoEvents
     Loop
 End Sub
 
-Private Function LimpiarHex(ByVal Valor As String) As String
+Public Function LimpiarHex(ByVal Valor As String) As String
     Valor = Trim(Valor)
     Valor = Replace(Valor, "h", "", , , vbTextCompare)
     Valor = Replace(Valor, "H", "", , , vbTextCompare)
@@ -21,7 +21,7 @@ Private Function LimpiarHex(ByVal Valor As String) As String
     LimpiarHex = UCase(Valor)
 End Function
 
-Private Function HexToLong(ByVal ValorHex As String) As Long
+Public Function HexToLong(ByVal ValorHex As String) As Long
     On Error Resume Next
     HexToLong = CLng("&H" & LimpiarHex(ValorHex))
     If Err.Number <> 0 Then
@@ -30,14 +30,14 @@ Private Function HexToLong(ByVal ValorHex As String) As Long
     End If
 End Function
 
-Private Function GetRAMCell(ws As Worksheet, Address As Long) As Range
+Public Function GetRAMCell(ws As Worksheet, Address As Long) As Range
     Dim Fila As Long, Columna As Long
     Fila = 21 + (Address \ 16)
     Columna = 3 + (Address Mod 16)
     Set GetRAMCell = ws.Cells(Fila, Columna)
 End Function
 
-Private Function GetRAMOriginalColor(Address As Long) As Long
+Public Function GetRAMOriginalColor(Address As Long) As Long
     If Address < 16 Then
         GetRAMOriginalColor = RGB(224, 242, 254) ' Código (Azul Claro)
     ElseIf Address >= 240 Then
@@ -66,7 +66,10 @@ Public Sub AgregarLog(ws As Worksheet, Mensaje As String)
     ws.Cells(12, 34).Value = "[" & Format(Now, "hh:mm:ss") & "] " & Mensaje
 End Sub
 
-Private Sub ResaltarInstruccionCodigo(ws As Worksheet, Address As Long)
+' ------------------------------------------------------------------------------
+' RESALTAR INSTRUCCIÓN ACTIVA EN LA TABLA "SEGMENTO DE CÓDIGO"
+' ------------------------------------------------------------------------------
+Public Sub ResaltarInstruccionCodigo(ws As Worksheet, Address As Long)
     Dim r As Long
     For r = 21 To 28
         ws.Cells(r, 20).Interior.Color = RGB(241, 245, 249)
@@ -89,7 +92,35 @@ Private Sub ResaltarInstruccionCodigo(ws As Worksheet, Address As Long)
     End If
 End Sub
 
-Sub CargarProgramaPrueba()
+' ------------------------------------------------------------------------------
+' BOTÓN: REINICIAR CPU (RESET REGISTROS Y MARCADOR VISUAL - MANTECHO RAM)
+' ------------------------------------------------------------------------------
+Public Sub ResetCPU()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
+    Application.ScreenUpdating = True
+    
+    ' Restablecer registros de la CPU a valores iniciales
+    ws.Range("C7").Value = "00h"         ' PC (Program Counter)
+    ws.Range("H7").Value = "00h 00h"    ' IR (Instruction Register)
+    ws.Range("M7").Value = "FFh"         ' SP (Stack Pointer al tope)
+    ws.Range("C12").Value = "00h"        ' MAR
+    ws.Range("H12").Value = "00h"        ' MDR
+    ws.Range("S7").Value = "00h"         ' AX
+    ws.Range("W7").Value = "00h"         ' BX
+    ws.Range("AA7").Value = "Z:0 C:0 S:0" ' Banderas (Flags)
+    
+    ' Volver el marcador visual de la tabla de código a la primera línea
+    ResaltarInstruccionCodigo ws, 0
+    
+    ws.Range("AH7").Value = "CPU REINICIADO: Registros en 00h (RAM intacta)"
+    AgregarLog ws, "=== CPU Reiniciado. PC restablecido a 00h ==="
+End Sub
+
+' ------------------------------------------------------------------------------
+' BOTÓN: CARGAR PROGRAMA (RESET COMPLETO + CARGA DE BYTES EN RAM)
+' ------------------------------------------------------------------------------
+Public Sub CargarProgramaPrueba()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
     Application.ScreenUpdating = True
@@ -100,7 +131,7 @@ Sub CargarProgramaPrueba()
         GetRAMCell(ws, addr).Interior.Color = GetRAMOriginalColor(addr)
     Next addr
     
-    ' Programa: Multiplicación por sumas sucesivas (3 * 4 = 12 / 0Ch)
+    ' Programa: Multiplicación 3 * 4 = 12 / 0Ch
     WriteRAM ws, 0, "10"  ' 00h: MOV AX, 00h
     WriteRAM ws, 1, "00"
     WriteRAM ws, 2, "11"  ' 02h: MOV BX, 03h
@@ -114,21 +145,15 @@ Sub CargarProgramaPrueba()
     WriteRAM ws, 10, "10"
     WriteRAM ws, 11, "FF" ' 0Bh: HLT
     
-    ws.Range("C7").Value = "00h"
-    ws.Range("H7").Value = "00h 00h"
-    ws.Range("M7").Value = "FFh"
-    ws.Range("C12").Value = "00h"
-    ws.Range("H12").Value = "00h"
-    ws.Range("S7").Value = "00h"
-    ws.Range("W7").Value = "00h"
-    ws.Range("AA7").Value = "Z:0 C:0 S:0"
-    
-    ResaltarInstruccionCodigo ws, 0
-    ws.Range("AH7").Value = "PROGRAMA CARGADO: Presione EJECUTAR PROGRAMA"
-    AgregarLog ws, "=== Programa cargado en RAM (00h-0Bh) ==="
+    ResetCPU
+    ws.Range("AH7").Value = "PROGRAMA CARGADO: Listo para ejecutar"
+    AgregarLog ws, "=== Programa demostrativo (3x4 por sumas) cargado en RAM ==="
 End Sub
 
-Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
+' ------------------------------------------------------------------------------
+' SUBRUTINA INTERNA DE UN CICLO
+' ------------------------------------------------------------------------------
+Public Function EjecutarUnCiclo(ws As Worksheet) As Boolean
     Dim ColorBusAddrNormal As Long, ColorBusAddrActivo As Long
     Dim ColorBusDataNormal As Long, ColorBusDataActivo As Long
     Dim ColorHighlightRAM As Long, ColorHighlightWrite As Long
@@ -139,8 +164,8 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
     ColorBusDataNormal = RGB(234, 179, 8)
     ColorBusDataActivo = RGB(255, 255, 0)
     
-    ColorHighlightRAM = RGB(254, 240, 138)   ' Amarillo lectura
-    ColorHighlightWrite = RGB(134, 239, 172)  ' Verde escritura
+    ColorHighlightRAM = RGB(254, 240, 138)
+    ColorHighlightWrite = RGB(134, 239, 172)
     ColorLEDNormal = RGB(15, 23, 42)
     ColorLEDActivo = RGB(30, 58, 138)
     
@@ -155,23 +180,22 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
     ResaltarInstruccionCodigo ws, MAR
     
     ws.Range("C7:F8").Interior.Color = ColorLEDActivo
-    Pausa 0.4
+    Pausa 0.2
     ws.Range("C12").Value = Format(Hex(MAR), "00") & "h"
     ws.Range("C12:F13").Interior.Color = ColorLEDActivo
     ws.Range("C7:F8").Interior.Color = ColorLEDNormal
     
-    ' Activar Bus de Direcciones e iluminar la celda RAM leída
     ws.Range("B16:AD16").Interior.Color = ColorBusAddrActivo
     Set CellRAM = GetRAMCell(ws, MAR)
     CellRAM.Interior.Color = ColorHighlightRAM
-    Pausa 0.6
+    Pausa 0.3
     
     Opcode = ReadRAM(ws, MAR)
     ws.Range("H12").Value = Opcode & "h"
     ws.Range("B16:AD16").Interior.Color = ColorBusAddrNormal
     ws.Range("B17:AD17").Interior.Color = ColorBusDataActivo
     ws.Range("H12:K13").Interior.Color = ColorLEDActivo
-    Pausa 0.6
+    Pausa 0.3
     
     If Opcode = "23" Or Opcode = "FF" Then
         Operando = "00"
@@ -195,19 +219,19 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
     
     ' --- DECODE ---
     AgregarLog ws, "DECODE: Opcode=" & Opcode & "h | Operando=" & Operando & "h"
-    Pausa 0.4
+    Pausa 0.2
     
     ' --- EXECUTE ---
     Select Case UCase(Opcode)
         Case "10" ' MOV AX, imm
             ws.Range("S7").Value = Operando & "h"
             AgregarLog ws, "EXECUTE [MOV AX]: Cargar " & Operando & "h en AX"
-            Pausa 0.5
+            Pausa 0.3
             
         Case "11" ' MOV BX, imm
             ws.Range("W7").Value = Operando & "h"
             AgregarLog ws, "EXECUTE [MOV BX]: Cargar " & Operando & "h en BX"
-            Pausa 0.5
+            Pausa 0.3
             
         Case "20" ' ADD AX, imm
             Dim ValAX As Long, ValImm As Long, ResADD As Long
@@ -217,7 +241,7 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
             
             ws.Range("S7").Value = Format(Hex(ResADD Mod 256), "00") & "h"
             AgregarLog ws, "EXECUTE [ADD AX, " & Operando & "h]: AX = " & Format(Hex(ResADD Mod 256), "00") & "h"
-            Pausa 0.5
+            Pausa 0.3
             
         Case "23" ' DEC BX
             Dim ValBX As Long, ZF As Integer
@@ -228,7 +252,7 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
             ZF = IIf(ValBX = 0, 1, 0)
             ws.Range("AA7").Value = "Z:" & ZF & " C:0 S:0"
             AgregarLog ws, "EXECUTE [DEC BX]: BX = " & Format(Hex(ValBX), "00") & "h (ZF=" & ZF & ")"
-            Pausa 0.5
+            Pausa 0.3
             
         Case "32" ' JNZ dir
             Dim StrFlags As String, ZeroFlagVal As Integer
@@ -243,19 +267,18 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
             Else
                 AgregarLog ws, "EXECUTE [JNZ " & Operando & "h]: FIN DE BUCLE (ZF=1) -> Continúa secuencialmente"
             End If
-            Pausa 0.5
+            Pausa 0.3
             
         Case "13" ' STORE [dir], AX
             Dim DirDestinoAX As Long
             DirDestinoAX = HexToLong(Operando)
             Set CellRAM = GetRAMCell(ws, DirDestinoAX)
             
-            ' Destello prolongado del bus y de la celda de la RAM al escribir
             ws.Range("B17:AD17").Interior.Color = ColorBusDataActivo
             WriteRAM ws, DirDestinoAX, CStr(ws.Range("S7").Value)
             CellRAM.Interior.Color = ColorHighlightWrite
             AgregarLog ws, "STORE: AX (" & ws.Range("S7").Value & ") guardado en RAM[" & Operando & "h]"
-            Pausa 1.2
+            Pausa 0.6
             
             ws.Range("B17:AD17").Interior.Color = ColorBusDataNormal
             CellRAM.Interior.Color = GetRAMOriginalColor(DirDestinoAX)
@@ -273,16 +296,16 @@ Private Function EjecutarUnCiclo(ws As Worksheet) As Boolean
     EjecutarUnCiclo = True
 End Function
 
-Sub EjecutarProgramaCompleto()
+' ------------------------------------------------------------------------------
+' BOTÓN: EJECUTAR PROGRAMA COMPLETO
+' ------------------------------------------------------------------------------
+Public Sub EjecutarProgramaCompleto()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
     Application.ScreenUpdating = True
     
-    CargarProgramaPrueba
-    Pausa 0.5
-    
-    ws.Range("AH7").Value = "EJECUTANDO BUCLE..."
-    AgregarLog ws, "=== INICIANDO EJECUCIÓN DEL BUCLE ==="
+    ws.Range("AH7").Value = "EJECUTANDO PROGRAMA..."
+    AgregarLog ws, "=== INICIANDO EJECUCIÓN ==="
     
     Dim Continuar As Boolean
     Continuar = True
