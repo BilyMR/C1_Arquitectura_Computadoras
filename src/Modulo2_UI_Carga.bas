@@ -70,7 +70,7 @@ Public Sub CargarProgramaPrueba()
     WriteRAM ws, 1, "00"
     WriteRAM ws, 2, "11"  ' 02h: MOV BX, 03h
     WriteRAM ws, 3, "03"
-    WriteRAM ws, 4, "20"  ' 04h: ADD AX, 04h
+    WriteRAM ws, 4, "20"  ' 04h: ADD AX, 04h / SUB
     WriteRAM ws, 5, "04"
     WriteRAM ws, 6, "23"  ' 06h: DEC BX
     WriteRAM ws, 7, "32"  ' 07h: JNZ 04h
@@ -82,4 +82,85 @@ Public Sub CargarProgramaPrueba()
     ResetCPU
     ws.Range("AH7").Value = "PROGRAMA CARGADO: Listo para ejecutar"
     AgregarLog ws, "=== Programa demostrativo (3x4 por sumas) cargado en RAM ==="
+End Sub
+Public Sub CargarPruebaUnderflow()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
+    
+    ' Limpiar RAM
+    Dim addr As Long
+    For addr = 0 To 255
+        WriteRAM ws, addr, "00"
+    Next addr
+    
+    ' Programa de prueba: Carga BX en 00h y le resta 1
+    WriteRAM ws, 0, "11"  ' 00h: MOV BX, 00h  (BX = 0)
+    WriteRAM ws, 1, "00"
+    WriteRAM ws, 2, "23"  ' 02h: DEC BX       (BX pasa a FFh / -1)
+    WriteRAM ws, 3, "32"  ' 03h: JNZ 02h      (Como FFh != 0, ZF=0 y salta de nuevo)
+    WriteRAM ws, 4, "02"
+    WriteRAM ws, 5, "FF"  ' 05h: HLT
+    
+    ResetCPU
+    ws.Range("AH7").Value = "PRUEBA UNDERFLOW CARGADA"
+    AgregarLog ws, "=== Prueba de entero negativo (Underflow) cargada ==="
+End Sub
+
+' ------------------------------------------------------------------------------
+' PROGRAMA DEMOSTRATIVO ADICIONAL: CÁLCULO DE FACTORIAL DE 4 (4! = 24 = 18h)
+' ------------------------------------------------------------------------------
+Public Sub CargarPruebaFactorial()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
+    Application.ScreenUpdating = True
+    
+    ' 1. Limpiar completamente la RAM
+    Dim addr As Long
+    For addr = 0 To 255
+        WriteRAM ws, addr, "00"
+        GetRAMCell(ws, addr).Interior.Color = GetRAMOriginalColor(addr)
+    Next addr
+    
+    ' 2. Carga del programa de Factorial para 4! = 24 (18h)
+    
+    ' --- FASE 1: Calcular 4 * 3 = 12 (0Ch) ---
+    WriteRAM ws, 0, "10"   ' 00h: MOV AX, 00h (Inicializa acumulador AX en 0)
+    WriteRAM ws, 1, "00"
+    WriteRAM ws, 2, "11"   ' 02h: MOV BX, 03h (BX = 3, contador para sumar 4 tres veces)
+    WriteRAM ws, 3, "03"
+    
+    ' Bucle 1 (Dirección 04h): Suma 4 tres veces (0 + 4 + 4 + 4 = 12 / 0Ch)
+    WriteRAM ws, 4, "20"   ' 04h: ADD AX, 04h (Suma 4 al acumulador)
+    WriteRAM ws, 5, "04"
+    WriteRAM ws, 6, "23"   ' 06h: DEC BX      (Decrementa contador BX)
+    WriteRAM ws, 7, "32"   ' 07h: JNZ 04h     (Salta a 04h si BX != 0)
+    WriteRAM ws, 8, "04"
+    
+    ' En este punto AX = 0Ch (12). Lo guardamos temporalmente en RAM[30h]
+    WriteRAM ws, 9, "13"   ' 09h: STORE [30h], AX (Guarda 12 en RAM[30h])
+    WriteRAM ws, 10, "30"
+    
+    ' --- FASE 2: Calcular 12 * 2 = 24 (18h) ---
+    WriteRAM ws, 11, "10"  ' 0Bh: MOV AX, 00h (Reinicia AX a 0)
+    WriteRAM ws, 12, "00"
+    WriteRAM ws, 13, "11"  ' 0Dh: MOV BX, 02h (BX = 2, contador para sumar 12 dos veces)
+    WriteRAM ws, 14, "02"
+    
+    ' Bucle 2 (Dirección 0Fh): Suma 12 (0Ch) dos veces (0 + 12 + 12 = 24 / 18h)
+    WriteRAM ws, 15, "20"  ' 0Fh: ADD AX, 0Ch (Suma 12 a AX)
+    WriteRAM ws, 16, "0C"
+    WriteRAM ws, 17, "23"  ' 11h: DEC BX      (Decrementa contador BX)
+    WriteRAM ws, 18, "32"  ' 12h: JNZ 0Fh     (Salta a 0Fh si BX != 0)
+    WriteRAM ws, 19, "0F"
+    
+    ' --- FASE 3: Guardar el resultado final (24 = 18h) en RAM ---
+    WriteRAM ws, 20, "13"  ' 14h: STORE [20h], AX (Guarda 18h en RAM[20h])
+    WriteRAM ws, 21, "20"
+    
+    WriteRAM ws, 22, "FF"  ' 16h: HLT (Fin de ejecución)
+    
+    ' 3. Reiniciar el CPU
+    ResetCPU
+    ws.Range("AH7").Value = "PROGRAMA FACTORIAL CARGADO: 4! = 24 (18h)"
+    AgregarLog ws, "=== Programa demostrativo Factorial 4! cargado en RAM ==="
 End Sub
