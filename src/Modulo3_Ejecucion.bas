@@ -148,6 +148,22 @@ Public Function EjecutarUnCiclo(ws As Worksheet) As Boolean
         ws.Range("S7").Value = Format(Hex(Resultado), "00") & "h"
         ActualizarFlags ws, Resultado
         AgregarLog ws, "EXECUTE [INC AX]: AX = " & ws.Range("S7").Value
+        
+    Case "29" ' INC BX
+        valBX = Val("&H" & Replace(ws.Range("W7").Value, "h", ""))
+        
+        Dim cfINC_BX As Integer
+        cfINC_BX = 0 ' En x86, INC no afecta el Carry (C)
+        
+        valBX = (valBX + 1) And &HFF
+        
+        Dim zfINC_BX As Integer, sfINC_BX As Integer
+        If valBX = 0 Then zfINC_BX = 1 Else zfINC_BX = 0
+        If (valBX And &H80) <> 0 Then sfINC_BX = 1 Else sfINC_BX = 0
+        
+        ws.Range("W7").Value = Right("0" & Hex(valBX), 2) & "h"
+        ws.Range("AA7").Value = "Z:" & zfINC_BX & " C:" & cfINC_BX & " S:" & sfINC_BX
+        AgregarLog ws, "EXECUTE [INC BX]: BX = " & ws.Range("W7").Value
 
     Case "23" ' DEC BX
         valBX = Val("&H" & Replace(ws.Range("W7").Value, "h", ""))
@@ -250,6 +266,25 @@ Public Function EjecutarUnCiclo(ws As Worksheet) As Boolean
         
         ws.Range("AA7").Value = "Z:" & zfCMP_BX & " C:" & cfCMP_BX & " S:" & sfCMP_BX
         AgregarLog ws, "EXECUTE [CMP AX, BX]: Banderas actualizadas"
+
+
+    Case "2A" ' SUB BX, imm (Resta un valor inmediato a BX)
+        Dim valResto2A As Long
+        valBX = Val("&H" & Replace(ws.Range("W7").Value, "h", ""))
+        valResto2A = Val("&H" & Operando)
+        
+        Dim cfSUB_BX_imm As Integer
+        If valBX < valResto2A Then cfSUB_BX_imm = 1 Else cfSUB_BX_imm = 0
+        
+        valBX = (valBX - valResto2A) And &HFF
+        
+        Dim zfSUB_BX_imm As Integer, sfSUB_BX_imm As Integer
+        If valBX = 0 Then zfSUB_BX_imm = 1 Else zfSUB_BX_imm = 0
+        If (valBX And &H80) <> 0 Then sfSUB_BX_imm = 1 Else sfSUB_BX_imm = 0
+        
+        ws.Range("W7").Value = Right("0" & Hex(valBX), 2) & "h"
+        ws.Range("AA7").Value = "Z:" & zfSUB_BX_imm & " C:" & cfSUB_BX_imm & " S:" & sfSUB_BX_imm
+        AgregarLog ws, "EXECUTE [SUB BX, " & Operando & "h]: BX = " & ws.Range("W7").Value
 
     ' --------------------------------------------------------------------------
     ' FAMILIA 3x y FF: CONTROL DE FLUJO Y SISTEMA
