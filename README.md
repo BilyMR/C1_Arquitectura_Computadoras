@@ -87,7 +87,7 @@ El procesador implementa una arquitectura optimizada con codificación de longit
 
 El simulador cuenta con rutinas integradas para validar distintos comportamientos de hardware y algoritmos de nivel académico:
 
-1. **Factorial de 4 (4! = 24 = 18h):** Realiza el cálculo matemático mediante fases de sumas sucesivas estructuradas, almacenando el resultado final directamente en la celda de memoria [20h].
+1. **Bifurcación Condicional:** Evalúa el estado actual del acumulador para desviar de manera dinámica el flujo de ejecución (PC), implementando saltos condicionales y control de flujo en la arquitectura.
 2. **Prueba de Underflow:** Ejecuta un conteo descendente a través de los límites de los 8 bits en complemento a dos, evidenciando el encadenamiento síncrono del Carry Flag durante el préstamo y la detención limpia tras 256 iteraciones.
 3. **Acumulación por Suma Sucesiva:** Simula operaciones aritméticas incrementales utilizando la instrucción ADD y saltos condicionales.
 
@@ -107,8 +107,11 @@ El simulador cuenta con rutinas integradas para validar distintos comportamiento
 ```text
 ├── src/
 │   ├── Simulador_CPU_VonNeumann.xlsm   # Libro de Excel habilitado para macros
-│   └── Modulos_VBA/                    # Código fuente exportado (Módulos 1, 2 y 3)
+│   └── Modulo1                   # Código fuente exportado (Módulos 1, 2 y 3)
+│   └── Modulo2
+│   └── Modulo3                
 ├── docs/
 │   └── diagrama_arquitectura.mmd       # Diagrama de arquitectura de bloques en Mermaid
+│   └── Presentación Similador de CPU Von Neumann.pptx    
 └── README.md                           # Documentación técnica principal del proyecto
 ```
