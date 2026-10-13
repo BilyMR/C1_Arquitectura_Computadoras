@@ -55,9 +55,21 @@ Public Sub WriteRAM(ws As Worksheet, Address As Long, Value As String)
 End Sub
 
 Public Sub AgregarLog(ws As Worksheet, Mensaje As String)
-    Dim i As Long
-    For i = 34 To 13 Step -1
-        ws.Cells(i, 34).Value = ws.Cells(i - 1, 34).Value
-    Next i
-    ws.Cells(12, 34).Value = "[" & Format(Now, "hh:mm:ss") & "] " & Mensaje
+    On Error Resume Next ' Evita errores si la hoja activa no tiene el cuadro de texto
+    
+    Dim nuevoMensaje As String
+    nuevoMensaje = "[" & Format(Now, "hh:mm:ss") & "] " & Mensaje
+    
+    ' Obtener el objeto TextBox llamado "txtLog" de la hoja
+    Dim txtBox As Object
+    Set txtBox = ws.OLEObjects("txtLog").Object
+    
+    ' Agregar el mensaje nuevo arriba y conservar el historial abajo
+    If txtBox.Text = "" Then
+        txtBox.Text = nuevoMensaje
+    Else
+        txtBox.Text = nuevoMensaje & vbCrLf & txtBox.Text
+    End If
+    
+    On Error GoTo 0
 End Sub
