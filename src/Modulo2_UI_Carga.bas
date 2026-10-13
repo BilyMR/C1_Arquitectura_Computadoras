@@ -1,8 +1,4 @@
 Option Explicit
-
-' ------------------------------------------------------------------------------
-' RESALTAR INSTRUCCIÓN ACTIVA EN LA TABLA "SEGMENTO DE CÓDIGO"
-' ------------------------------------------------------------------------------
 Public Sub ResaltarInstruccionCodigo(ws As Worksheet, Address As Long)
     Dim r As Long
     For r = 21 To 28
@@ -25,36 +21,28 @@ Public Sub ResaltarInstruccionCodigo(ws As Worksheet, Address As Long)
         ws.Range(ws.Cells(FilaObjetivo, 20), ws.Cells(FilaObjetivo, 23)).Interior.Color = RGB(254, 240, 138)
     End If
 End Sub
-
-' ------------------------------------------------------------------------------
-' BOTÓN: REINICIAR CPU (RESET REGISTROS Y MARCADOR VISUAL - MANTIENE RAM)
-' ------------------------------------------------------------------------------
 Public Sub ResetCPU()
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
-    Application.ScreenUpdating = True
+    Set ws = ActiveSheet
     
-    ' Restablecer registros de la CPU a valores iniciales
-    ws.Range("C7").Value = "00h"         ' PC (Program Counter)
-    ws.Range("H7").Value = "00h 00h"    ' IR (Instruction Register)
-    ws.Range("M7").Value = "FFh"         ' SP (Stack Pointer al tope)
-    ws.Range("C12").Value = "00h"        ' MAR
-    ws.Range("H12").Value = "00h"        ' MDR
-    ws.Range("S7").Value = "00h"         ' AX
-    ws.Range("W7").Value = "00h"         ' BX
-    ws.Range("AA7").Value = "Z:0 C:0 S:0" ' Banderas (Flags)
+    ' --- TUS LÍNEAS HABITUALES DE RESET (ej. limpiar registros, banderas, RAM, etc.) ---
+    ws.Range("S7").Value = "00h" ' Limpiar AX
+    ws.Range("W7").Value = "00h" ' Limpiar BX
+    ws.Range("AA7").Value = "Z:0 C:0 S:0" ' Limpiar Banderas
+    ws.Range("C7").Value = "00h" ' Limpiar PC
     
-    ' Volver el marcador visual de la tabla de código a la primera línea
-    ResaltarInstruccionCodigo ws, 0
+    ' --- NUEVA LÍNEA: LIMPIAR EL HISTORIAL DEL LOG (TextBox) ---
+    On Error Resume Next ' Evita errores si la hoja activa no tiene el cuadro de texto
+    ws.OLEObjects("txtLog").Object.Text = ""
+    On Error GoTo 0
     
-    ws.Range("AH7").Value = "CPU REINICIADO: Registros en 00h (RAM intacta)"
-    AgregarLog ws, "=== CPU Reiniciado. PC restablecido a 00h ==="
+    ' Mensaje de estado inicial
+    ws.Range("AH7").Value = "SISTEMA REINICIADO (READY)"
+    
+    ' Opcional: Si quieres registrar el reset en el log ya limpio
+    ' AgregarLog ws, "CPU Reiniciada a estado inicial."
 End Sub
-
-' ------------------------------------------------------------------------------
-' BOTÓN: CARGAR PROGRAMA (RESET COMPLETO + CARGA DE BYTES EN RAM)
-' ------------------------------------------------------------------------------
-Public Sub CargarProgramaPrueba()
+Public Sub CargarProgramaSuma()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
     Application.ScreenUpdating = True
@@ -105,62 +93,51 @@ Public Sub CargarPruebaUnderflow()
     ws.Range("AH7").Value = "PRUEBA UNDERFLOW CARGADA"
     AgregarLog ws, "=== Prueba de entero negativo (Underflow) cargada ==="
 End Sub
+Private Sub EscribirRAM_Matriz(ws As Worksheet, direccion As Long, valor As String)
+    ' Fila donde empieza la dirección 00h (Fila 21)
+    Dim filaBase As Long
+    filaBase = 21
+    
+    ' Columna donde empieza el offset +0 (Columna C es la número 3)
+    Dim colBase As Long
+    colBase = 3
+    
+    ' Cálculo exacto para matriz de 16 bytes por fila:
+    ' - Fila: Se desplaza hacia abajo cada 16 posiciones (Int(direccion / 16))
+    ' - Columna: El residuo indica el desplazamiento de +0 a +F (direccion Mod 16)
+    Dim filaDestino As Long
+    Dim colDestino As Long
+    
+    filaDestino = filaBase + Int(direccion / 16)
+    colDestino = colBase + (direccion Mod 16)
+    
+    ' Escribe el valor en la celda exacta de la matriz visual
+    ws.Cells(filaDestino, colDestino).Value = valor
+End Sub
 
-' ------------------------------------------------------------------------------
-' PROGRAMA DEMOSTRATIVO ADICIONAL: CÁLCULO DE FACTORIAL DE 4 (4! = 24 = 18h)
-' ------------------------------------------------------------------------------
-Public Sub CargarPruebaFactorial()
+Public Sub CargarPrograma_Bifurcacion()
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Simulador Von Neumann")
-    Application.ScreenUpdating = True
+    Set ws = ActiveSheet
     
-    ' 1. Limpiar completamente la RAM
-    Dim addr As Long
-    For addr = 0 To 255
-        WriteRAM ws, addr, "00"
-        GetRAMCell(ws, addr).Interior.Color = GetRAMOriginalColor(addr)
-    Next addr
+    On Error GoTo ManejadorError
     
-    ' 2. Carga del programa de Factorial para 4! = 24 (18h)
+    ' 1. Limpiar registros y estado inicial de la CPU
+    Call ResetCPU
     
-    ' --- FASE 1: Calcular 4 * 3 = 12 (0Ch) ---
-    WriteRAM ws, 0, "10"   ' 00h: MOV AX, 00h (Inicializa acumulador AX en 0)
-    WriteRAM ws, 1, "00"
-    WriteRAM ws, 2, "11"   ' 02h: MOV BX, 03h (BX = 3, contador para sumar 4 tres veces)
-    WriteRAM ws, 3, "03"
+    ' 2. Secuencia de bytes del programa de Bifurcación
+    Dim bytesProg As Variant
+    bytesProg = Array("10", "05", "13", "15", "15", "15", "27", "05", "31", "0C", "10", "00", "10", "FF", "13", "20", "FF")
     
-    ' Bucle 1 (Dirección 04h): Suma 4 tres veces (0 + 4 + 4 + 4 = 12 / 0Ch)
-    WriteRAM ws, 4, "20"   ' 04h: ADD AX, 04h (Suma 4 al acumulador)
-    WriteRAM ws, 5, "04"
-    WriteRAM ws, 6, "23"   ' 06h: DEC BX      (Decrementa contador BX)
-    WriteRAM ws, 7, "32"   ' 07h: JNZ 04h     (Salta a 04h si BX != 0)
-    WriteRAM ws, 8, "04"
+    ' 3. Volcar los bytes distribuyéndolos ordenadamente en la matriz de la RAM
+    Dim i As Long
+    For i = LBound(bytesProg) To UBound(bytesProg)
+        EscribirRAM_Matriz ws, CLng(i), bytesProg(i) & "h"
+    Next i
     
-    ' En este punto AX = 0Ch (12). Lo guardamos temporalmente en RAM[30h]
-    WriteRAM ws, 9, "13"   ' 09h: STORE [30h], AX (Guarda 12 en RAM[30h])
-    WriteRAM ws, 10, "30"
-    
-    ' --- FASE 2: Calcular 12 * 2 = 24 (18h) ---
-    WriteRAM ws, 11, "10"  ' 0Bh: MOV AX, 00h (Reinicia AX a 0)
-    WriteRAM ws, 12, "00"
-    WriteRAM ws, 13, "11"  ' 0Dh: MOV BX, 02h (BX = 2, contador para sumar 12 dos veces)
-    WriteRAM ws, 14, "02"
-    
-    ' Bucle 2 (Dirección 0Fh): Suma 12 (0Ch) dos veces (0 + 12 + 12 = 24 / 18h)
-    WriteRAM ws, 15, "20"  ' 0Fh: ADD AX, 0Ch (Suma 12 a AX)
-    WriteRAM ws, 16, "0C"
-    WriteRAM ws, 17, "23"  ' 11h: DEC BX      (Decrementa contador BX)
-    WriteRAM ws, 18, "32"  ' 12h: JNZ 0Fh     (Salta a 0Fh si BX != 0)
-    WriteRAM ws, 19, "0F"
-    
-    ' --- FASE 3: Guardar el resultado final (24 = 18h) en RAM ---
-    WriteRAM ws, 20, "13"  ' 14h: STORE [20h], AX (Guarda 18h en RAM[20h])
-    WriteRAM ws, 21, "20"
-    
-    WriteRAM ws, 22, "FF"  ' 16h: HLT (Fin de ejecución)
-    
-    ' 3. Reiniciar el CPU
-    ResetCPU
-    ws.Range("AH7").Value = "PROGRAMA FACTORIAL CARGADO: 4! = 24 (18h)"
-    AgregarLog ws, "=== Programa demostrativo Factorial 4! cargado en RAM ==="
+    ' 4. AGREGAR ESTA LÍNEA: Enviar el mensaje al cuadro de texto del Log
+    AgregarLog ws, "=== Prueba de bifurcación cargada ==="
+    Exit Sub
+
+ManejadorError:
+    MsgBox "Ocurrió un error al cargar: " & Err.Description, vbCritical, "Error"
 End Sub
